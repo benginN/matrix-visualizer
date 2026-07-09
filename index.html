@@ -111,6 +111,19 @@
   .col-hint .j { color: var(--red); }
   .col-hint .k { color: var(--blue); }
 
+  .ops { display: flex; gap: 5px; justify-content: center; margin-top: 10px; }
+  .ops button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    border-radius: 5px;
+    padding: 3px 9px;
+    font-size: 11.5px;
+    cursor: pointer;
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  }
+  .ops button:hover { border-color: var(--accent); color: var(--accent); }
+
   /* presets */
   .presets { display: flex; flex-wrap: wrap; gap: 5px; }
   .presets button {
@@ -151,6 +164,18 @@
   #resetBtn:hover { color: var(--text); }
   #tSlider { flex: 1; accent-color: var(--accent); }
   #tLabel { font-variant-numeric: tabular-nums; font-size: 11px; color: var(--dim); width: 52px; text-align: right; }
+  .path-row { display: flex; gap: 5px; margin-top: 9px; }
+  .path-row button {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--dim);
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .path-row button:hover { color: var(--text); }
+  .path-row button.active { color: var(--accent); border-color: rgba(94,179,255,0.3); }
 
   /* toggles */
   .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 8px; }
@@ -216,10 +241,12 @@
   .mm span { text-align: right; }
 
   .hint { font-size: 11px; color: var(--dim); line-height: 1.55; margin-top: 16px; }
+  .hint a { color: var(--dim); text-decoration: none; border-bottom: 1px solid var(--border); }
+  .hint a:hover { color: var(--accent); }
 
   /* ---------- canvas ---------- */
   #canvasWrap { flex: 1; position: relative; }
-  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #canvas.grabbable { cursor: grab; }
   #canvas.grabbing { cursor: grabbing; }
 
@@ -280,6 +307,12 @@
         </div>
         <div class="col-hint"><span class="i">î</span><span class="j">ĵ</span><span class="k">k̂</span></div>
       </div>
+      <div class="ops">
+        <button data-op="tp" title="Transpose">Mᵀ</button>
+        <button data-op="inv" title="Inverse">M⁻¹</button>
+        <button data-op="neg" title="Negate">−M</button>
+        <button data-op="sq" title="Square">M²</button>
+      </div>
     </section>
 
     <section>
@@ -294,6 +327,10 @@
         <button id="resetBtn" title="Reset">⟲</button>
         <input id="tSlider" type="range" min="0" max="1" step="0.001" value="0">
         <span id="tLabel">t = 0.00</span>
+      </div>
+      <div class="path-row">
+        <button id="path-blend" class="active">blend</button>
+        <button id="path-svd" title="decompose the motion into SVD steps">rotate · scale · rotate</button>
       </div>
     </section>
 
@@ -314,6 +351,7 @@
     </section>
 
     <div class="hint" id="hint"></div>
+    <div class="hint"><a href="https://github.com/benginN/matrix-visualizer" target="_blank" rel="noopener">source ↗</a></div>
   </aside>
 
   <main id="canvasWrap">
@@ -700,6 +738,116 @@ function decomp3(M) {
   return out;
 }
 
+/* ================= SVD & rotation paths ================= */
+const mul2 = (a, b) => [
+  a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3],
+  a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3],
+];
+const tp2 = (m) => [m[0], m[2], m[1], m[3]];
+const rot2 = (t) => [Math.cos(t), -Math.sin(t), Math.sin(t), Math.cos(t)];
+const diag3 = (s) => [s[0], 0, 0, 0, s[1], 0, 0, 0, s[2]];
+
+// rotation form: M = R(thU) · diag(s0, s1) · R(thV), s1 < 0 iff det < 0
+function svd2rot(m) {
+  const E = (m[0] + m[3]) / 2, F = (m[0] - m[3]) / 2;
+  const G = (m[2] + m[1]) / 2, H = (m[2] - m[1]) / 2;
+  const Q = Math.hypot(E, H), R = Math.hypot(F, G);
+  const a1 = Math.atan2(G, F), a2 = Math.atan2(H, E);
+  return { s: [Q + R, Q - R], thU: (a2 + a1) / 2, thV: (a2 - a1) / 2 };
+}
+// display form: σ ≥ 0, M = U·Σ·Vᵀ (U may include a reflection)
+function svd2(m) {
+  const { s, thU, thV } = svd2rot(m);
+  const U = rot2(thU), Vt = rot2(thV);
+  if (s[1] < 0) { s[1] = -s[1]; U[1] = -U[1]; U[3] = -U[3]; }
+  return { U, S: s, Vt };
+}
+
+function svd3(m) {
+  const eg = eigen3(mul3(tp3(m), m)); // AᵀA: symmetric PSD, groups sorted desc
+  const vcols = [], svals = [];
+  for (const g of eg.groups) {
+    const s = Math.sqrt(Math.max(0, g.l));
+    if (g.space) { vcols.push([1, 0, 0], [0, 1, 0], [0, 0, 1]); svals.push(s, s, s); }
+    else if (g.plane) { const [t1, t2] = planeBasis(g.plane); vcols.push(t1, t2); svals.push(s, s); }
+    else if (g.v) { vcols.push(g.v); svals.push(s); }
+  }
+  if (vcols.length !== 3) return null;
+  const ucols = vcols.map((v, i) =>
+    svals[i] > 1e-8 ? apply3(m, v).map(x => x / svals[i]) : null);
+  if (!ucols[0]) { ucols[0] = [1, 0, 0]; ucols[1] = [0, 1, 0]; ucols[2] = [0, 0, 1]; }
+  else {
+    if (!ucols[1]) ucols[1] = planeBasis(norm3(ucols[0]))[0];
+    if (!ucols[2]) ucols[2] = norm3(cross3(ucols[0], ucols[1]));
+  }
+  return { U: colsToMat3(ucols), S: svals, V: colsToMat3(vcols) };
+}
+// rotation form: U, V ∈ SO(3), s2 < 0 iff det < 0
+function svd3rot(m) {
+  const d = svd3(m);
+  if (!d) return null;
+  const flip = (M, c) => { M[c] = -M[c]; M[3 + c] = -M[3 + c]; M[6 + c] = -M[6 + c]; };
+  if (det3(d.V) < 0) { flip(d.V, 2); flip(d.U, 2); }
+  if (det3(d.U) < 0) { flip(d.U, 2); d.S[2] = -d.S[2]; }
+  return { U: d.U, S: d.S, Vt: tp3(d.V) };
+}
+
+function axisAngle(R) {
+  const c = clamp((R[0] + R[4] + R[8] - 1) / 2, -1, 1);
+  const ang = Math.acos(c);
+  if (ang < 1e-9) return { axis: [0, 0, 1], ang: 0 };
+  if (Math.PI - ang < 1e-5) {
+    // R = 2aaᵀ − I → axis from the strongest column of (R + I)/2
+    const B = R.map((x, i) => (x + (i % 4 === 0 ? 1 : 0)) / 2);
+    let best = null, bn = 0;
+    for (const col of [[B[0], B[3], B[6]], [B[1], B[4], B[7]], [B[2], B[5], B[8]]]) {
+      const n = Math.hypot(...col);
+      if (n > bn) { bn = n; best = col; }
+    }
+    return { axis: norm3(best), ang: Math.PI };
+  }
+  const s = 2 * Math.sin(ang);
+  return { axis: [(R[7] - R[5]) / s, (R[2] - R[6]) / s, (R[3] - R[1]) / s], ang };
+}
+function rotAA(a, ang) {
+  const [x, y, z] = a, c = Math.cos(ang), s = Math.sin(ang), C = 1 - c;
+  return [
+    c + x * x * C,     x * y * C - z * s, x * z * C + y * s,
+    y * x * C + z * s, c + y * y * C,     y * z * C - x * s,
+    z * x * C - y * s, z * y * C + x * s, c + z * z * C,
+  ];
+}
+
+// animation paths: 'blend' lerps I → M; 'svd' plays rotate → scale → rotate
+function pathMat2(M, te) {
+  if (state.path !== 'svd') return lerp2(M, te);
+  const { s, thU, thV } = svd2rot(M);
+  if (te <= 1 / 3) return rot2(thV * te * 3);
+  const Vt = rot2(thV);
+  if (te <= 2 / 3) {
+    const k = (te - 1 / 3) * 3;
+    return mul2([1 + (s[0] - 1) * k, 0, 0, 1 + (s[1] - 1) * k], Vt);
+  }
+  const k = (te - 2 / 3) * 3;
+  return mul2(rot2(thU * k), mul2([s[0], 0, 0, s[1]], Vt));
+}
+function pathMat3(M, te) {
+  if (state.path !== 'svd') return lerp3(M, te);
+  const d = svd3rot(M);
+  if (!d) return lerp3(M, te);
+  if (te <= 1 / 3) {
+    const av = axisAngle(d.Vt);
+    return rotAA(av.axis, av.ang * te * 3);
+  }
+  if (te <= 2 / 3) {
+    const k = (te - 1 / 3) * 3;
+    return mul3(diag3([1 + (d.S[0] - 1) * k, 1 + (d.S[1] - 1) * k, 1 + (d.S[2] - 1) * k]), d.Vt);
+  }
+  const au = axisAngle(d.U);
+  const k = (te - 2 / 3) * 3;
+  return mul3(rotAA(au.axis, au.ang * k), mul3(diag3(d.S), d.Vt));
+}
+
 /* ================= formatting ================= */
 function fmt(x, dp = 2) {
   if (!isFinite(x)) return '∞';
@@ -720,6 +868,8 @@ const state = {
   M2: [1, 1, 0, 1],
   M3: [1, 0.4, 0, 0, 1, 0, 0.3, 0, 1],
   t: 0,
+  path: 'blend',
+  probe: null,        // user-placed input vector (2D)
   playing: false, playFrom: 0, playStart: 0, duration: 1600,
   scale2: 72,
   scale3: 64,
@@ -776,10 +926,24 @@ function buildPresets() {
   for (const [name, m] of list) {
     const b = document.createElement('button');
     b.textContent = name;
-    b.addEventListener('click', () => { setMatrix([...m]); startPlay(0); });
+    b.addEventListener('click', (e) => {
+      // shift-click composes the preset onto the current matrix
+      const cur = state.mode === '2d' ? state.M2 : state.M3;
+      const mul = state.mode === '2d' ? mul2 : mul3;
+      setMatrix(e.shiftKey ? mul(m, cur) : [...m]);
+      startPlay(0);
+    });
     host.appendChild(b);
   }
 }
+
+/* quick matrix operations */
+document.querySelectorAll('.ops button').forEach(b => b.addEventListener('click', () => {
+  const M = state.mode === '2d' ? state.M2 : state.M3;
+  const [tp, inv, mul] = state.mode === '2d' ? [tp2, inv2, mul2] : [tp3, inv3, mul3];
+  const r = { tp: () => tp(M), inv: () => inv(M), neg: () => M.map(x => -x), sq: () => mul(M, M) }[b.dataset.op]();
+  if (r) { setMatrix(r); startPlay(0); }
+}));
 
 /* ================= matrix <-> inputs ================= */
 const in2 = [0, 1, 2, 3].map(i => $('m2-' + i));
@@ -813,8 +977,8 @@ function setMode(mode) {
   $('mat2').style.display = mode === '2d' ? '' : 'none';
   $('mat3').style.display = mode === '3d' ? '' : 'none';
   $('hint').innerHTML = mode === '2d'
-    ? 'Drag the tips of <b style="color:var(--green)">î</b> and <b style="color:var(--red)">ĵ</b> to reshape the matrix — shift snaps to 0.5. Scroll to zoom, space to play.'
-    : 'Drag to orbit the camera, scroll to zoom, space to play.';
+    ? 'Drag the tips of <b style="color:var(--green)">î</b> and <b style="color:var(--red)">ĵ</b> to reshape the matrix (⇧ snaps to 0.5). Double-click to drop a probe vector. ⇧-click a preset to compose it onto the current matrix. Scroll zooms, space plays.'
+    : 'Drag to orbit the camera. ⇧-click a preset to compose it onto the current matrix. Scroll zooms, space plays.';
   buildPresets();
   buildToggles();
   setMatrix(mode === '2d' ? state.M2 : state.M3);
@@ -860,6 +1024,7 @@ function setT(t) {
 function startPlay(fromT = null) {
   if (fromT !== null) setT(fromT);
   if (state.t >= 1) setT(0);
+  state.duration = state.path === 'svd' ? 2800 : 1600;
   state.playing = true;
   state.playFrom = state.t;
   state.playStart = performance.now();
@@ -875,6 +1040,14 @@ document.addEventListener('keydown', (e) => {
     state.playing ? stopPlay() : startPlay();
   }
 });
+for (const p of ['blend', 'svd']) {
+  $('path-' + p).addEventListener('click', () => {
+    state.path = p;
+    $('path-blend').classList.toggle('active', p === 'blend');
+    $('path-svd').classList.toggle('active', p === 'svd');
+    startPlay(0);
+  });
+}
 
 /* ================= URL hash ================= */
 function updateHash() {
@@ -932,10 +1105,12 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 function hitTest2d(px, py) {
-  const Mt = lerp2(state.M2, ease(state.t));
+  const Mt = pathMat2(state.M2, ease(state.t));
   for (const [w, x, y] of [['2d-i', Mt[0], Mt[2]], ['2d-j', Mt[1], Mt[3]]]) {
     if (Math.hypot(px - sx(x), py - sy(y)) < 15) return w;
   }
+  if (state.probe && Math.hypot(px - sx(state.probe[0]), py - sy(state.probe[1])) < 13)
+    return 'probe';
   return null;
 }
 canvas.addEventListener('pointerdown', (e) => {
@@ -943,14 +1118,23 @@ canvas.addEventListener('pointerdown', (e) => {
   if (state.mode === '2d') {
     const hit = hitTest2d(e.offsetX, e.offsetY);
     if (!hit) return;
-    stopPlay();
-    setT(1);
+    if (hit !== 'probe') { stopPlay(); setT(1); }
     state.drag = hit;
   } else {
     state.drag = 'orbit';
   }
   canvas.setPointerCapture(e.pointerId);
   canvas.classList.add('grabbing');
+});
+canvas.addEventListener('dblclick', (e) => {
+  if (state.mode !== '2d') return;
+  if (state.probe &&
+      Math.hypot(e.offsetX - sx(state.probe[0]), e.offsetY - sy(state.probe[1])) < 14) {
+    state.probe = null; // double-click the tip again to remove
+    return;
+  }
+  const [wx, wy] = toWorld(e.offsetX, e.offsetY);
+  state.probe = [Math.round(wx * 20) / 20, Math.round(wy * 20) / 20];
 });
 canvas.addEventListener('pointermove', (e) => {
   if (state.drag === 'orbit') {
@@ -961,6 +1145,7 @@ canvas.addEventListener('pointermove', (e) => {
     let [wx, wy] = toWorld(e.offsetX, e.offsetY);
     if (e.shiftKey) { wx = Math.round(wx * 2) / 2; wy = Math.round(wy * 2) / 2; }
     else { wx = Math.round(wx * 100) / 100; wy = Math.round(wy * 100) / 100; }
+    if (state.drag === 'probe') { state.probe = [wx, wy]; return; }
     const m = [...state.M2];
     if (state.drag === '2d-i') { m[0] = wx; m[2] = wy; }
     else { m[1] = wx; m[3] = wy; }
@@ -1024,7 +1209,7 @@ function gridExtent2(Mt) {
 
 /* ================= render 2D ================= */
 function render2d(te) {
-  const Mt = lerp2(state.M2, te);
+  const Mt = pathMat2(state.M2, te);
   const eg = eigen2(state.M2);
 
   // static grid + axes + numbers
@@ -1107,8 +1292,8 @@ function render2d(te) {
       ctx.strokeStyle = 'rgba(242, 193, 78, 0.5)';
       line(-ux * L, -uy * L, ux * L, uy * L);
       ctx.setLineDash([]);
-      const mu = (1 - te) + te * p.l;
-      arrowPx(sx(0), sy(0), sx(ux * mu), sy(uy * mu), '#f2c14e', 2.4);
+      const [ex2, ey2] = apply2(Mt, ux, uy); // = μ(t)·v on any path
+      arrowPx(sx(0), sy(0), sx(ex2), sy(ey2), '#f2c14e', 2.4);
       if (state.show.labels) {
         const lx = ux * Math.min(L, 3.4 + idx * 0.5), ly = uy * Math.min(L, 3.4 + idx * 0.5);
         label('λ' + (eg.pairs.length > 1 ? SUB[idx] : '') + ' = ' + fmt(p.l), sx(lx), sy(ly), '#f2c14e');
@@ -1132,6 +1317,28 @@ function render2d(te) {
     ctx.strokeStyle = 'rgba(192, 132, 252, 0.2)';
     ctx.lineWidth = 1;
     ctx.stroke();
+    // singular axes of the current ellipse
+    const sd = svd2(Mt);
+    ctx.strokeStyle = 'rgba(192, 132, 252, 0.5)';
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 2; i++) {
+      const ax = sd.U[i] * sd.S[i], ay = sd.U[2 + i] * sd.S[i];
+      line(-ax, -ay, ax, ay);
+      if (state.show.labels && sd.S[i] > 0.05)
+        label('σ' + SUB[i], sx(ax), sy(ay), 'rgba(192,132,252,0.85)', 6, -4);
+    }
+  }
+
+  // probe vector: v (ghost) and M(t)·v
+  if (state.probe) {
+    const [vx, vy] = state.probe;
+    const [tx2, ty2] = apply2(Mt, vx, vy);
+    arrowPx(sx(0), sy(0), sx(vx), sy(vy), 'rgba(219,226,240,0.3)', 2);
+    arrowPx(sx(0), sy(0), sx(tx2), sy(ty2), '#dbe2f0', 2.4);
+    if (state.show.labels) {
+      label('v', sx(vx), sy(vy), 'rgba(219,226,240,0.5)', 8, -6);
+      label(`Mv (${fmt(tx2)}, ${fmt(ty2)})`, sx(tx2), sy(ty2), '#dbe2f0', 8, -6);
+    }
   }
 
   // basis vectors
@@ -1170,7 +1377,7 @@ function arrow3(v, color, width) {
 }
 
 function render3d(te) {
-  const Mt = lerp3(state.M3, te);
+  const Mt = pathMat3(state.M3, te);
   const eg = eigen3(state.M3);
   const EXT = 3;
 
@@ -1232,6 +1439,12 @@ function render3d(te) {
       ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
       ctx.lineWidth = 1.4;
       ctx.stroke();
+    }
+    // singular axes of the current ellipsoid
+    const sd = svd3(Mt);
+    if (sd) for (let i = 0; i < 3; i++) {
+      const a = [sd.U[i] * sd.S[i], sd.U[3 + i] * sd.S[i], sd.U[6 + i] * sd.S[i]];
+      line3([-a[0], -a[1], -a[2]], a, '192, 132, 252', 0.5, 1.2);
     }
   }
 
@@ -1310,8 +1523,7 @@ function render3d(te) {
       ctx.setLineDash([6, 6]);
       line3([-ux * L, -uy * L, -uz * L], [ux * L, uy * L, uz * L], '242, 193, 78', 0.55, 1.3);
       ctx.setLineDash([]);
-      const mu = (1 - te) + te * g.l;
-      arrow3([ux * mu, uy * mu, uz * mu], '#f2c14e', 2.2);
+      arrow3(apply3(Mt, [ux, uy, uz]), '#f2c14e', 2.2); // = μ(t)·v on any path
       if (state.show.labels) {
         const q = project([ux * 3.4, uy * 3.4, uz * 3.4]);
         label('λ' + (eg.groups.length > 1 ? SUB[idx] : '') + ' = ' + fmt(g.l), q[0], q[1], '#f2c14e');
@@ -1457,6 +1669,13 @@ function updateDecomp() {
     html += `<div class="mats">${matHTML('P', dec.P, n)}${matHTML('C', dec.D, n)}${matHTML('P⁻¹', dec.Pinv, n)}</div>`;
   }
   if (dec.note) html += `<div class="dec-eq">${dec.note}</div>`;
+  const sv = n === 2 ? svd2(state.M2) : svd3(state.M3);
+  if (sv) {
+    const Vt = n === 2 ? sv.Vt : tp3(sv.V);
+    const Sig = n === 2 ? [sv.S[0], 0, 0, sv.S[1]] : diag3(sv.S);
+    html += `<div class="dec-eq" style="margin-top:12px">Singular value decomposition: <b>M = U·Σ·Vᵀ</b></div>` +
+            `<div class="mats">${matHTML('U', sv.U, n)}${matHTML('Σ', Sig, n)}${matHTML('Vᵀ', Vt, n)}</div>`;
+  }
   html += dec.inv
     ? `<div class="dec-eq" style="margin-top:12px">Inverse:</div><div class="mats">${matHTML('M⁻¹', dec.inv, n)}</div>`
     : `<div class="dec-eq" style="margin-top:12px">M⁻¹ does not exist (det = 0)</div>`;
