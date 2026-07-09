@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix Visualizer</title>
+<style>
+  :root {
+    --bg: #0d1017;
+    --border: #232a3a;
+    --text: #dbe2f0;
+    --dim: #7d879c;
+    --accent: #5eb3ff;
+    --green: #52d97e;
+    --red: #ff6b6b;
+    --gold: #f2c14e;
+    --violet: #c084fc;
+    --blue: #6ea8ff;
+    --orange: #fb923c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "SF Pro Text", -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+  }
+  #app { display: flex; height: 100vh; }
+
+  /* ---------- sidebar ---------- */
+  #sidebar {
+    width: 300px;
+    min-width: 300px;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 18px 16px;
+  }
+  #sidebar h1 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+  #sidebar h1 span { color: var(--accent); font-weight: 400; }
+
+  .tabs {
+    display: flex;
+    margin-top: 14px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .tabs button {
+    flex: 1;
+    padding: 5px 0;
+    background: transparent;
+    border: none;
+    color: var(--dim);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tabs button.active { background: rgba(94,179,255,0.12); color: var(--accent); }
+
+  section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: none; }
+  section h2 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  /* matrix input */
+  .matrix-wrap { display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .bracket {
+    font-weight: 200;
+    color: var(--dim);
+    user-select: none;
+    font-family: Georgia, serif;
+    line-height: 0.85;
+  }
+  .matrix-grid { display: grid; gap: 6px; }
+  .matrix-grid.g2 { grid-template-columns: repeat(2, 1fr); }
+  .matrix-grid.g3 { grid-template-columns: repeat(3, 1fr); }
+  .matrix-grid input {
+    padding: 7px 4px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color 0.15s;
+    font-size: 14px;
+  }
+  .matrix-grid.g2 input { width: 78px; }
+  .matrix-grid.g3 input { width: 58px; font-size: 13px; }
+  .matrix-grid input:focus { border-color: var(--accent); }
+  .matrix-grid input::-webkit-outer-spin-button,
+  .matrix-grid input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .col-hint {
+    display: flex;
+    justify-content: space-around;
+    font-size: 10.5px;
+    color: var(--dim);
+    font-style: italic;
+    margin-top: 6px;
+    padding: 0 26px;
+  }
+  .col-hint .i { color: var(--green); }
+  .col-hint .j { color: var(--red); }
+  .col-hint .k { color: var(--blue); }
+
+  /* presets */
+  .presets { display: flex; flex-wrap: wrap; gap: 5px; }
+  .presets button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .presets button:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* animation */
+  .anim-row { display: flex; align-items: center; gap: 9px; }
+  #playBtn {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    font-size: 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  #playBtn:hover { background: rgba(94,179,255,0.12); }
+  #resetBtn {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--dim);
+    font-size: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  #resetBtn:hover { color: var(--text); }
+  #tSlider { flex: 1; accent-color: var(--accent); }
+  #tLabel { font-variant-numeric: tabular-nums; font-size: 11px; color: var(--dim); width: 52px; text-align: right; }
+
+  /* toggles */
+  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 8px; }
+  .toggles label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--dim);
+    user-select: none;
+  }
+  .toggles label:hover { color: var(--text); }
+  .toggles input { accent-color: var(--accent); }
+
+  /* properties */
+  .prop-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 4px 0;
+    gap: 10px;
+  }
+  .prop-row .k { color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .prop-row .v {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    text-align: right;
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  }
+  .v.gold { color: var(--gold); }
+  .v.violet { color: var(--violet); }
+  .v.accent { color: var(--accent); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .chip {
+    font-size: 10.5px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    color: var(--dim);
+    border: 1px solid var(--border);
+  }
+  .chip.warn { color: var(--orange); border-color: rgba(251,146,60,0.35); }
+  .chip.gold { color: var(--gold); border-color: rgba(242,193,78,0.3); }
+
+  /* decomposition */
+  .dec-eq { font-size: 11.5px; color: var(--dim); margin: 8px 0 6px; }
+  .dec-eq b { color: var(--text); font-weight: 600; }
+  .mats { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-start; }
+  .mmbox { text-align: center; }
+  .mml { font-size: 11px; color: var(--dim); margin-bottom: 3px; font-family: Georgia, serif; font-style: italic; }
+  .mm {
+    display: inline-grid;
+    gap: 2px 9px;
+    padding: 3px 7px;
+    position: relative;
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .mm::before, .mm::after { content: ""; position: absolute; top: 0; bottom: 0; width: 4px; border: 1px solid var(--dim); }
+  .mm::before { left: 0; border-right: none; }
+  .mm::after { right: 0; border-left: none; }
+  .mm span { text-align: right; }
+
+  .hint { font-size: 11px; color: var(--dim); line-height: 1.55; margin-top: 16px; }
+
+  /* ---------- canvas ---------- */
+  #canvasWrap { flex: 1; position: relative; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #canvas.grabbable { cursor: grab; }
+  #canvas.grabbing { cursor: grabbing; }
+
+  #hud {
+    position: absolute;
+    top: 12px; right: 14px;
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 11.5px;
+    color: var(--dim);
+    pointer-events: none;
+    line-height: 1.6;
+    text-align: right;
+  }
+  #hud .m { color: var(--text); }
+
+  #sidebar::-webkit-scrollbar { width: 6px; }
+  #sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 760px) {
+    #app { flex-direction: column; }
+    #sidebar { width: 100%; min-width: 0; max-height: 55vh; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <h1>Matrix <span>Visualizer</span></h1>
+    <div class="tabs">
+      <button id="tab-2d" class="active">2 × 2</button>
+      <button id="tab-3d">3 × 3</button>
+    </div>
+
+    <section>
+      <h2>Matrix</h2>
+      <div id="mat2">
+        <div class="matrix-wrap">
+          <div class="bracket" style="font-size:58px">[</div>
+          <div class="matrix-grid g2">
+            <input id="m2-0" type="number" step="0.1">
+            <input id="m2-1" type="number" step="0.1">
+            <input id="m2-2" type="number" step="0.1">
+            <input id="m2-3" type="number" step="0.1">
+          </div>
+          <div class="bracket" style="font-size:58px">]</div>
+        </div>
+        <div class="col-hint"><span class="i">î</span><span class="j">ĵ</span></div>
+      </div>
+      <div id="mat3" style="display:none">
+        <div class="matrix-wrap">
+          <div class="bracket" style="font-size:84px">[</div>
+          <div class="matrix-grid g3">
+            <input id="m3-0" type="number" step="0.1"><input id="m3-1" type="number" step="0.1"><input id="m3-2" type="number" step="0.1">
+            <input id="m3-3" type="number" step="0.1"><input id="m3-4" type="number" step="0.1"><input id="m3-5" type="number" step="0.1">
+            <input id="m3-6" type="number" step="0.1"><input id="m3-7" type="number" step="0.1"><input id="m3-8" type="number" step="0.1">
+          </div>
+          <div class="bracket" style="font-size:84px">]</div>
+        </div>
+        <div class="col-hint"><span class="i">î</span><span class="j">ĵ</span><span class="k">k̂</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Presets</h2>
+      <div class="presets" id="presets"></div>
+    </section>
+
+    <section>
+      <h2>Animation</h2>
+      <div class="anim-row">
+        <button id="playBtn" title="Play (space)">▶</button>
+        <button id="resetBtn" title="Reset">⟲</button>
+        <input id="tSlider" type="range" min="0" max="1" step="0.001" value="0">
+        <span id="tLabel">t = 0.00</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>View</h2>
+      <div class="toggles" id="toggles"></div>
+    </section>
+
+    <section>
+      <h2>Properties</h2>
+      <div id="props"></div>
+      <div class="chips" id="chips"></div>
+    </section>
+
+    <section>
+      <h2>Decomposition</h2>
+      <div id="decomp"></div>
+    </section>
+
+    <div class="hint" id="hint"></div>
+  </aside>
+
+  <main id="canvasWrap">
+    <canvas id="canvas"></canvas>
+    <div id="hud"></div>
+  </main>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Matrix Visualizer — 2×2 and 3×3 linear transformations
+   Animation uses M(t) = (1−t)·I + t·M, which keeps every
+   eigendirection of M invariant for all t.
+   ============================================================ */
+
+const EPS = 1e-9;
+const TAU = Math.PI * 2;
+const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+
+/* ================= 2×2 math ================= */
+const det2 = (m) => m[0] * m[3] - m[1] * m[2];
+const lerp2 = (m, t) => [1 + t * (m[0] - 1), t * m[1], t * m[2], 1 + t * (m[3] - 1)];
+const apply2 = (m, x, y) => [m[0] * x + m[1] * y, m[2] * x + m[3] * y];
+
+function eigen2(m) {
+  const tr = m[0] + m[3], det = det2(m);
+  const disc = tr * tr - 4 * det;
+  const out = { tr, det, complex: false, pairs: [], fullPlane: false, defective: false };
+  if (disc < -EPS) {
+    out.complex = true; out.re = tr / 2; out.im = Math.sqrt(-disc) / 2;
+    return out;
+  }
+  const s = Math.sqrt(Math.max(0, disc));
+  const norm = (v) => { const h = Math.hypot(v[0], v[1]); return [v[0] / h, v[1] / h]; };
+  const vecFor = (l) => {
+    let v = [m[1], l - m[0]];
+    if (Math.hypot(v[0], v[1]) > EPS) return norm(v);
+    v = [l - m[3], m[2]];
+    if (Math.hypot(v[0], v[1]) > EPS) return norm(v);
+    return null; // M = λI
+  };
+  const l1 = (tr + s) / 2, l2 = (tr - s) / 2;
+  const v1 = vecFor(l1);
+  if (Math.abs(disc) <= EPS) {
+    if (v1 === null) { out.fullPlane = true; out.pairs = [{ l: l1, v: null }]; }
+    else { out.defective = true; out.pairs = [{ l: l1, v: v1 }]; }
+  } else {
+    out.pairs = [{ l: l1, v: v1 }, { l: l2, v: vecFor(l2) }];
+  }
+  return out;
+}
+
+function sv2(m) {
+  const t2 = m[0] * m[0] + m[1] * m[1] + m[2] * m[2] + m[3] * m[3];
+  const d2 = det2(m) ** 2;
+  const s = Math.sqrt(Math.max(0, t2 * t2 - 4 * d2));
+  return [Math.sqrt(Math.max(0, (t2 + s) / 2)), Math.sqrt(Math.max(0, (t2 - s) / 2))];
+}
+const rank2 = (m) => m.every(x => Math.abs(x) < EPS) ? 0 : (Math.abs(det2(m)) < 1e-8 ? 1 : 2);
+
+/* ================= 3×3 math ================= */
+const I3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+const det3 = (m) =>
+  m[0] * (m[4] * m[8] - m[5] * m[7]) -
+  m[1] * (m[3] * m[8] - m[5] * m[6]) +
+  m[2] * (m[3] * m[7] - m[4] * m[6]);
+const lerp3 = (m, t) => m.map((v, i) => (i % 4 === 0 ? 1 + t * (v - 1) : t * v));
+const apply3 = (m, p) => [
+  m[0] * p[0] + m[1] * p[1] + m[2] * p[2],
+  m[3] * p[0] + m[4] * p[1] + m[5] * p[2],
+  m[6] * p[0] + m[7] * p[1] + m[8] * p[2],
+];
+const mul3 = (a, b) => {
+  const r = new Array(9);
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++)
+    r[i * 3 + j] = a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j];
+  return r;
+};
+const tp3 = (m) => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
+
+// roots of x³ + a2·x² + a1·x + a0
+function solveCubic(a2, a1, a0) {
+  const f = (x) => ((x + a2) * x + a1) * x + a0;
+  const fp = (x) => (3 * x + 2 * a2) * x + a1;
+  const polish = (x) => {
+    for (let i = 0; i < 4; i++) { const d = fp(x); if (Math.abs(d) > 1e-12) x -= f(x) / d; }
+    return x;
+  };
+  const p = a1 - a2 * a2 / 3;
+  const q = 2 * a2 ** 3 / 27 - a2 * a1 / 3 + a0;
+  const off = -a2 / 3;
+  const disc = -4 * p ** 3 - 27 * q * q;
+  const tol = 1e-10 * Math.max(1, p * p, Math.abs(q)) ** 1.5;
+
+  if (Math.abs(p) < 1e-10 && Math.abs(q) < 1e-12)
+    return { real: [off, off, off], complex: null };
+  if (disc > tol) {
+    const mAmp = 2 * Math.sqrt(-p / 3);
+    const th = Math.acos(clamp(3 * q / (2 * p) * Math.sqrt(-3 / p), -1, 1)) / 3;
+    const r = [0, 1, 2].map(k => polish(mAmp * Math.cos(th - TAU * k / 3) + off));
+    r.sort((a, b) => b - a);
+    return { real: r, complex: null };
+  }
+  if (disc >= -tol) { // repeated real roots
+    const t1 = 3 * q / p, t2 = -3 * q / (2 * p);
+    const r = [polish(t1 + off), polish(t2 + off), polish(t2 + off)];
+    r.sort((a, b) => b - a);
+    return { real: r, complex: null };
+  }
+  // one real + complex pair
+  const sq = Math.sqrt(q * q / 4 + p ** 3 / 27);
+  const u = Math.cbrt(-q / 2 + sq), v = Math.cbrt(-q / 2 - sq);
+  const x1 = polish(u + v + off);
+  // deflate: x² + βx + γ
+  const beta = a2 + x1, gamma = a1 + x1 * beta;
+  const d2q = beta * beta - 4 * gamma;
+  return { real: [x1], complex: { re: -beta / 2, im: Math.sqrt(Math.max(0, -d2q)) / 2 } };
+}
+
+const norm3 = (v) => {
+  const h = Math.hypot(v[0], v[1], v[2]);
+  return h > EPS ? [v[0] / h, v[1] / h, v[2] / h] : null;
+};
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+// eigenvector(s) for eigenvalue l of 3×3 m
+function eigvec3(m, l) {
+  const B = [m[0] - l, m[1], m[2], m[3], m[4] - l, m[5], m[6], m[7], m[8] - l];
+  const r = [[B[0], B[1], B[2]], [B[3], B[4], B[5]], [B[6], B[7], B[8]]];
+  let best = null, bestN = 1e-7;
+  for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) {
+    const c = cross3(r[i], r[j]);
+    const n = Math.hypot(c[0], c[1], c[2]);
+    if (n > bestN) { bestN = n; best = c; }
+  }
+  if (best) return { v: norm3(best) };
+  // rank(B) ≤ 1 → eigenspace is a plane (or all of space)
+  let row = null, rn = 1e-7;
+  for (const rr of r) {
+    const n = Math.hypot(rr[0], rr[1], rr[2]);
+    if (n > rn) { rn = n; row = rr; }
+  }
+  return row ? { plane: norm3(row) } : { space: true };
+}
+
+function eigen3(m) {
+  const tr = m[0] + m[4] + m[8];
+  const minorSum =
+    (m[4] * m[8] - m[5] * m[7]) + (m[0] * m[8] - m[2] * m[6]) + (m[0] * m[4] - m[1] * m[3]);
+  const det = det3(m);
+  const { real, complex } = solveCubic(-tr, minorSum, -det);
+  // group repeated roots
+  const groups = [];
+  for (const l of [...real].sort((a, b) => b - a)) {
+    const g = groups.find(g => Math.abs(g.l - l) < 1e-6 * Math.max(1, Math.abs(l)));
+    if (g) g.mult++;
+    else groups.push({ l, mult: 1 });
+  }
+  for (const g of groups) Object.assign(g, eigvec3(m, g.l));
+  return { tr, det, minorSum, groups, complex };
+}
+
+function sv3(m) {
+  const ata = mul3(tp3(m), m);
+  const tr = ata[0] + ata[4] + ata[8];
+  const ms = (ata[4] * ata[8] - ata[5] * ata[7]) + (ata[0] * ata[8] - ata[2] * ata[6]) + (ata[0] * ata[4] - ata[1] * ata[3]);
+  const { real } = solveCubic(-tr, ms, -det3(ata));
+  const r = (real.length === 3 ? real : [real[0], real[0], real[0]]).map(x => Math.sqrt(Math.max(0, x)));
+  r.sort((a, b) => b - a);
+  return r;
+}
+
+function rank3(m) {
+  if (Math.abs(det3(m)) > 1e-8) return 3;
+  for (const [a, b, c, d] of [
+    [0, 1, 3, 4], [0, 2, 3, 5], [1, 2, 4, 5],
+    [0, 1, 6, 7], [0, 2, 6, 8], [1, 2, 7, 8],
+    [3, 4, 6, 7], [3, 5, 6, 8], [4, 5, 7, 8],
+  ]) if (Math.abs(m[a] * m[d] - m[b] * m[c]) > 1e-8) return 2;
+  return m.some(x => Math.abs(x) > EPS) ? 1 : 0;
+}
+
+/* ================= inverses / decompositions ================= */
+function inv2(m) {
+  const d = det2(m);
+  if (Math.abs(d) < 1e-10) return null;
+  return [m[3] / d, -m[1] / d, -m[2] / d, m[0] / d];
+}
+function inv3(m) {
+  const d = det3(m);
+  if (Math.abs(d) < 1e-10) return null;
+  return [
+    m[4] * m[8] - m[5] * m[7], m[2] * m[7] - m[1] * m[8], m[1] * m[5] - m[2] * m[4],
+    m[5] * m[6] - m[3] * m[8], m[0] * m[8] - m[2] * m[6], m[2] * m[3] - m[0] * m[5],
+    m[3] * m[7] - m[4] * m[6], m[1] * m[6] - m[0] * m[7], m[0] * m[4] - m[1] * m[3],
+  ].map(x => x / d);
+}
+
+// solve 3×3 Bx = b (rank-deficient allowed, free variables = 0)
+function solve3(B, b) {
+  const M = [
+    [B[0], B[1], B[2], b[0]],
+    [B[3], B[4], B[5], b[1]],
+    [B[6], B[7], B[8], b[2]],
+  ];
+  const piv = [];
+  let r = 0;
+  for (let c = 0; c < 3 && r < 3; c++) {
+    let p = r;
+    for (let i = r + 1; i < 3; i++) if (Math.abs(M[i][c]) > Math.abs(M[p][c])) p = i;
+    if (Math.abs(M[p][c]) < 1e-9) continue;
+    [M[r], M[p]] = [M[p], M[r]];
+    for (let i = 0; i < 3; i++) {
+      if (i === r) continue;
+      const f = M[i][c] / M[r][c];
+      for (let j = c; j < 4; j++) M[i][j] -= f * M[r][j];
+    }
+    piv.push([r, c]);
+    r++;
+  }
+  const x = [0, 0, 0];
+  for (const [rr, cc] of piv) x[cc] = M[rr][3] / M[rr][cc];
+  return x;
+}
+
+// orthonormal basis of the plane with unit normal n
+function planeBasis(n) {
+  const t1 = norm3(cross3(n, Math.abs(n[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0]));
+  return [t1, cross3(n, t1)];
+}
+
+// complex eigenvector z = u + i·w of A for λ = re + i·im (via complex row cross products)
+function ceig3vec(A, re, im) {
+  const rows = [];
+  for (let r = 0; r < 3; r++) {
+    const row = [];
+    for (let c = 0; c < 3; c++)
+      row.push([A[r * 3 + c] - (r === c ? re : 0), r === c ? -im : 0]);
+    rows.push(row);
+  }
+  const cmul = (x, y) => [x[0] * y[0] - x[1] * y[1], x[0] * y[1] + x[1] * y[0]];
+  const csub = (x, y) => [x[0] - y[0], x[1] - y[1]];
+  const ccross = (a, b) => [
+    csub(cmul(a[1], b[2]), cmul(a[2], b[1])),
+    csub(cmul(a[2], b[0]), cmul(a[0], b[2])),
+    csub(cmul(a[0], b[1]), cmul(a[1], b[0])),
+  ];
+  let best = null, bn = 1e-8;
+  for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) {
+    const c = ccross(rows[i], rows[j]);
+    const n = Math.hypot(c[0][0], c[0][1], c[1][0], c[1][1], c[2][0], c[2][1]);
+    if (n > bn) { bn = n; best = c.map(x => [x[0] / n, x[1] / n]); }
+  }
+  return best ? { u: best.map(x => x[0]), w: best.map(x => x[1]) } : null;
+}
+
+const colsToMat3 = (c) => [
+  c[0][0], c[1][0], c[2][0],
+  c[0][1], c[1][1], c[2][1],
+  c[0][2], c[1][2], c[2][2],
+];
+
+/* decomp2 / decomp3 return:
+   { inv, kind: 'diag'|'jordan'|'complex'|null, P, D, Pinv, note } */
+function decomp2(M) {
+  const eg = eigen2(M);
+  const out = { inv: inv2(M), kind: null };
+  if (eg.complex) {
+    const a = eg.re, b = eg.im;
+    // z = (m01, λ−m00) — m01 ≠ 0 whenever eigenvalues are complex
+    const u = [M[1], a - M[0]], w = [0, b];
+    out.kind = 'complex';
+    out.P = [u[0], -w[0], u[1], -w[1]];
+    out.D = [a, -b, b, a];
+    out.note = `C acts as rotation ${fmt(Math.atan2(b, a) * 180 / Math.PI, 1)}° · scale ${fmt(Math.hypot(a, b))}×`;
+  } else if (eg.fullPlane) {
+    out.kind = 'diag';
+    out.P = [1, 0, 0, 1];
+    out.D = [eg.pairs[0].l, 0, 0, eg.pairs[0].l];
+  } else if (eg.defective) {
+    const l = eg.pairs[0].l, v = eg.pairs[0].v;
+    const B = [M[0] - l, M[1], M[2], M[3] - l];
+    // both columns of B lie in span(v); w solves Bw = v
+    const c1 = B[0] * v[0] + B[2] * v[1];
+    const c2 = B[1] * v[0] + B[3] * v[1];
+    const w = Math.abs(c1) >= Math.abs(c2) ? [1 / c1, 0] : [0, 1 / c2];
+    out.kind = 'jordan';
+    out.P = [v[0], w[0], v[1], w[1]];
+    out.D = [l, 1, 0, l];
+  } else {
+    const [p1, p2] = eg.pairs;
+    out.kind = 'diag';
+    out.P = [p1.v[0], p2.v[0], p1.v[1], p2.v[1]];
+    out.D = [p1.l, 0, 0, p2.l];
+  }
+  out.Pinv = inv2(out.P);
+  return out;
+}
+
+function decomp3(M) {
+  const eg = eigen3(M);
+  const out = { inv: inv3(M), kind: null };
+  if (eg.complex) {
+    const a = eg.complex.re, b = eg.complex.im;
+    const z = ceig3vec(M, a, b);
+    const rg = eg.groups[0];
+    if (z && rg && rg.v) {
+      out.kind = 'complex';
+      out.P = colsToMat3([z.u, z.w.map(x => -x), rg.v]);
+      out.D = [a, -b, 0, b, a, 0, 0, 0, rg.l];
+      out.note = `block acts as rotation ${fmt(Math.atan2(b, a) * 180 / Math.PI, 1)}° · scale ${fmt(Math.hypot(a, b))}×`;
+    }
+  } else {
+    const cols = [], diag = [];
+    let defect = null;
+    for (const g of eg.groups) {
+      const gm = g.space ? 3 : g.plane ? 2 : g.v ? 1 : 0;
+      if (gm >= g.mult) {
+        if (g.space) { cols.push([1, 0, 0], [0, 1, 0], [0, 0, 1]); diag.push(g.l, g.l, g.l); }
+        else if (g.plane) { const [t1, t2] = planeBasis(g.plane); cols.push(t1, t2); diag.push(g.l, g.l); }
+        else { cols.push(g.v); diag.push(g.l); }
+      } else defect = g;
+    }
+    if (!defect && cols.length === 3) {
+      out.kind = 'diag';
+      out.P = colsToMat3(cols);
+      out.D = [diag[0], 0, 0, 0, diag[1], 0, 0, 0, diag[2]];
+    } else if (defect) {
+      const l = defect.l;
+      const B = M.map((x, i) => i % 4 === 0 ? x - l : x);
+      out.kind = 'jordan';
+      if (defect.mult === 2) {
+        // one 2-block + a simple eigenvalue
+        const v = defect.v;
+        const w = solve3(B, v);
+        const other = eg.groups.find(g => g !== defect);
+        if (other && other.v) {
+          out.P = colsToMat3([v, w, other.v]);
+          out.D = [l, 1, 0, 0, l, 0, 0, 0, other.l];
+        } else out.kind = null;
+      } else {
+        // triple eigenvalue
+        const B2 = mul3(B, B);
+        const E = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+        if (Math.max(...B2.map(Math.abs)) < 1e-7) {
+          // B² = 0 → blocks 2 + 1
+          let x = E[0], bn = 0;
+          for (const e of E) {
+            const n = Math.hypot(...apply3(B, e));
+            if (n > bn) { bn = n; x = e; }
+          }
+          const v = apply3(B, x).map(c => c / bn);   // unit eigenvector, v = B·w
+          const w = x.map(c => c / bn);
+          // kernel vector independent of v
+          let k = null, kn = 0;
+          for (const t of (defect.plane ? planeBasis(defect.plane) : E)) {
+            const dp = t[0] * v[0] + t[1] * v[1] + t[2] * v[2];
+            const q = [t[0] - dp * v[0], t[1] - dp * v[1], t[2] - dp * v[2]];
+            const n = Math.hypot(...q);
+            if (n > kn) { kn = n; k = q.map(c => c / n); }
+          }
+          out.P = colsToMat3([v, w, k]);
+          out.D = [l, 1, 0, 0, l, 0, 0, 0, l];
+        } else {
+          // full 3-block: chain B²x → Bx → x
+          let x = E[0], bn = 0;
+          for (const e of E) {
+            const n = Math.hypot(...apply3(B2, e));
+            if (n > bn) { bn = n; x = e; }
+          }
+          out.P = colsToMat3([
+            apply3(B2, x).map(c => c / bn),
+            apply3(B, x).map(c => c / bn),
+            x.map(c => c / bn),
+          ]);
+          out.D = [l, 1, 0, 0, l, 1, 0, 0, l];
+        }
+      }
+    }
+  }
+  if (out.P) out.Pinv = inv3(out.P);
+  if (out.kind && !out.Pinv) out.kind = null; // numerically degenerate — show inverse only
+  return out;
+}
+
+/* ================= formatting ================= */
+function fmt(x, dp = 2) {
+  if (!isFinite(x)) return '∞';
+  if (Math.abs(x) < 5e-9) x = 0;
+  const r = Math.round(x);
+  if (Math.abs(x - r) < 1e-9) return String(r);
+  return x.toFixed(dp).replace(/\.?0+$/, '');
+}
+function fmtVec(v) {
+  const mx = Math.max(...v.map(Math.abs));
+  return '(' + v.map(x => fmt(x / mx)).join(', ') + ')';
+}
+const SUB = '₁₂₃';
+
+/* ================= state ================= */
+const state = {
+  mode: '2d',
+  M2: [1, 1, 0, 1],
+  M3: [1, 0.4, 0, 0, 1, 0, 0.3, 0, 1],
+  t: 0,
+  playing: false, playFrom: 0, playStart: 0, duration: 1600,
+  scale2: 72,
+  scale3: 64,
+  cam: { yaw: 0.62, pitch: 0.42, R: 11 },
+  show: { grid: true, bggrid: true, square: true, eigen: true, circle: false, labels: true },
+  drag: null,      // '2d-i' | '2d-j' | 'orbit'
+  hover: null,
+  last: [0, 0],
+};
+
+const $ = (id) => document.getElementById(id);
+const canvas = $('canvas'), ctx = canvas.getContext('2d');
+const hud = $('hud');
+
+/* ================= presets ================= */
+const R2 = (deg) => {
+  const r = deg * Math.PI / 180, c = +Math.cos(r).toFixed(3), s = +Math.sin(r).toFixed(3);
+  return [c, -s, s, c];
+};
+const PRESETS_2D = [
+  ['Identity', [1, 0, 0, 1]],
+  ['Rotate 45°', R2(45)],
+  ['Rotate 90°', R2(90)],
+  ['Shear', [1, 1, 0, 1]],
+  ['Scale 2×', [2, 0, 0, 2]],
+  ['Squeeze', [2, 0, 0, 0.5]],
+  ['Reflect x', [1, 0, 0, -1]],
+  ['Reflect y=x', [0, 1, 1, 0]],
+  ['Project x', [1, 0, 0, 0]],
+  ['Singular', [1, 2, 0.5, 1]],
+  ['Symmetric', [2, 1, 1, 2]],
+  ['Spiral', [0.65, -0.55, 0.55, 0.65]],
+];
+const RZ3 = (deg) => { const [c, ms, s, c2] = R2(deg); return [c, ms, 0, s, c2, 0, 0, 0, 1]; };
+const PRESETS_3D = [
+  ['Identity', [...I3]],
+  ['Rotate z 45°', RZ3(45)],
+  ['Rotate x 90°', [1, 0, 0, 0, 0, -1, 0, 1, 0]],
+  ['Rotate (1,1,1)', [0, 0, 1, 1, 0, 0, 0, 1, 0]],
+  ['Scale 2×', [2, 0, 0, 0, 2, 0, 0, 0, 2]],
+  ['Squash', [1.5, 0, 0, 0, 1.5, 0, 0, 0, 0.4]],
+  ['Shear', [1, 1, 0, 0, 1, 0, 0, 0, 1]],
+  ['Reflect z', [1, 0, 0, 0, 1, 0, 0, 0, -1]],
+  ['Project xy', [1, 0, 0, 0, 1, 0, 0, 0, 0]],
+  ['Singular', [1, 0, 1, 0, 1, 1, 1, 1, 2]],
+  ['Symmetric', [2, 1, 0, 1, 2, 0, 0, 0, 1]],
+  ['Spiral', [0.651, -0.546, 0, 0.546, 0.651, 0, 0, 0, 1.15]],
+];
+
+function buildPresets() {
+  const host = $('presets');
+  host.innerHTML = '';
+  const list = state.mode === '2d' ? PRESETS_2D : PRESETS_3D;
+  for (const [name, m] of list) {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.addEventListener('click', () => { setMatrix([...m]); startPlay(0); });
+    host.appendChild(b);
+  }
+}
+
+/* ================= matrix <-> inputs ================= */
+const in2 = [0, 1, 2, 3].map(i => $('m2-' + i));
+const in3 = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => $('m3-' + i));
+
+function setMatrix(m, { fromInputs = false } = {}) {
+  if (state.mode === '2d') {
+    state.M2 = m.map(x => +x || 0);
+    if (!fromInputs) in2.forEach((el, i) => el.value = fmt(state.M2[i], 3));
+  } else {
+    state.M3 = m.map(x => +x || 0);
+    if (!fromInputs) in3.forEach((el, i) => el.value = fmt(state.M3[i], 3));
+  }
+  updateHash();
+  updateProps();
+}
+in2.forEach((el, i) => el.addEventListener('input', () => {
+  const v = parseFloat(el.value);
+  if (isFinite(v)) { state.M2[i] = v; updateHash(); updateProps(); }
+}));
+in3.forEach((el, i) => el.addEventListener('input', () => {
+  const v = parseFloat(el.value);
+  if (isFinite(v)) { state.M3[i] = v; updateHash(); updateProps(); }
+}));
+
+/* ================= mode switch ================= */
+function setMode(mode) {
+  state.mode = mode;
+  $('tab-2d').classList.toggle('active', mode === '2d');
+  $('tab-3d').classList.toggle('active', mode === '3d');
+  $('mat2').style.display = mode === '2d' ? '' : 'none';
+  $('mat3').style.display = mode === '3d' ? '' : 'none';
+  $('hint').innerHTML = mode === '2d'
+    ? 'Drag the tips of <b style="color:var(--green)">î</b> and <b style="color:var(--red)">ĵ</b> to reshape the matrix — shift snaps to 0.5. Scroll to zoom, space to play.'
+    : 'Drag to orbit the camera, scroll to zoom, space to play.';
+  buildPresets();
+  buildToggles();
+  setMatrix(mode === '2d' ? state.M2 : state.M3);
+  setT(0);
+  startPlay(0);
+}
+$('tab-2d').addEventListener('click', () => state.mode !== '2d' && setMode('2d'));
+$('tab-3d').addEventListener('click', () => state.mode !== '3d' && setMode('3d'));
+
+/* ================= toggles ================= */
+const TOGGLE_DEFS = [
+  ['grid',   'Transformed grid', 'Transformed grid'],
+  ['bggrid', 'Original grid',    'Floor & axes'],
+  ['square', 'Unit square (det)','Unit cube (det)'],
+  ['eigen',  'Eigenvectors',     'Eigenvectors'],
+  ['circle', 'Circle → ellipse', 'Sphere → ellipsoid'],
+  ['labels', 'Labels',           'Labels'],
+];
+function buildToggles() {
+  const host = $('toggles');
+  host.innerHTML = '';
+  for (const [key, l2, l3] of TOGGLE_DEFS) {
+    const lab = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.show[key];
+    cb.addEventListener('change', () => state.show[key] = cb.checked);
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(' ' + (state.mode === '2d' ? l2 : l3)));
+    host.appendChild(lab);
+  }
+}
+
+/* ================= playback ================= */
+const tSlider = $('tSlider'), tLabel = $('tLabel'), playBtn = $('playBtn');
+const ease = (x) => x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2;
+
+function setT(t) {
+  state.t = clamp(t, 0, 1);
+  tSlider.value = state.t;
+  tLabel.textContent = 't = ' + state.t.toFixed(2);
+}
+function startPlay(fromT = null) {
+  if (fromT !== null) setT(fromT);
+  if (state.t >= 1) setT(0);
+  state.playing = true;
+  state.playFrom = state.t;
+  state.playStart = performance.now();
+  playBtn.textContent = '❚❚';
+}
+function stopPlay() { state.playing = false; playBtn.textContent = '▶'; }
+playBtn.addEventListener('click', () => state.playing ? stopPlay() : startPlay());
+$('resetBtn').addEventListener('click', () => { stopPlay(); setT(0); });
+tSlider.addEventListener('input', () => { stopPlay(); setT(parseFloat(tSlider.value)); });
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    state.playing ? stopPlay() : startPlay();
+  }
+});
+
+/* ================= URL hash ================= */
+function updateHash() {
+  const m = state.mode === '2d' ? state.M2 : state.M3;
+  history.replaceState(null, '', '#' + state.mode + ':' + m.map(x => +x.toFixed(4)).join(','));
+}
+function readHash() {
+  const mt = location.hash.slice(1).match(/^(2d|3d):(.+)$/);
+  if (!mt) return false;
+  const nums = mt[2].split(',').map(parseFloat);
+  if (mt[1] === '2d' && nums.length === 4 && nums.every(isFinite)) { state.M2 = nums; return '2d'; }
+  if (mt[1] === '3d' && nums.length === 9 && nums.every(isFinite)) { state.M3 = nums; return '3d'; }
+  return false;
+}
+
+/* ================= canvas / coords ================= */
+let W = 0, H = 0, CX = 0, CY = 0;
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const r = canvas.getBoundingClientRect();
+  W = r.width; H = r.height;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  CX = W / 2; CY = H / 2;
+}
+new ResizeObserver(resize).observe(canvas);
+resize();
+
+// 2D world -> screen
+const sx = (x) => CX + x * state.scale2;
+const sy = (y) => CY - y * state.scale2;
+const toWorld = (px, py) => [(px - CX) / state.scale2, (CY - py) / state.scale2];
+
+// 3D world -> screen (orbit camera, z up)
+function project(p) {
+  const { yaw, pitch, R } = state.cam;
+  const ca = Math.cos(yaw), sa = Math.sin(yaw), cb = Math.cos(pitch), sb = Math.sin(pitch);
+  const ex = R * cb * ca, ey = R * cb * sa, ez = R * sb;
+  const px = p[0] - ex, py = p[1] - ey, pz = p[2] - ez;
+  const cx = -sa * px + ca * py;                       // right
+  const cy = -ca * sb * px - sa * sb * py + cb * pz;   // up
+  const d = -cb * ca * px - cb * sa * py - sb * pz;    // depth (≈ R at origin)
+  const s = state.scale3 * state.cam.R / Math.max(0.5, d);
+  return [CX + cx * s, CY - cy * s, d];
+}
+const fade = (d) => clamp(1 - (d - state.cam.R) / 9, 0.25, 1);
+
+/* ================= pointer interaction ================= */
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const f = Math.exp(-e.deltaY * 0.0015);
+  if (state.mode === '2d') state.scale2 = clamp(state.scale2 * f, 14, 220);
+  else state.scale3 = clamp(state.scale3 * f, 16, 240);
+}, { passive: false });
+
+function hitTest2d(px, py) {
+  const Mt = lerp2(state.M2, ease(state.t));
+  for (const [w, x, y] of [['2d-i', Mt[0], Mt[2]], ['2d-j', Mt[1], Mt[3]]]) {
+    if (Math.hypot(px - sx(x), py - sy(y)) < 15) return w;
+  }
+  return null;
+}
+canvas.addEventListener('pointerdown', (e) => {
+  state.last = [e.offsetX, e.offsetY];
+  if (state.mode === '2d') {
+    const hit = hitTest2d(e.offsetX, e.offsetY);
+    if (!hit) return;
+    stopPlay();
+    setT(1);
+    state.drag = hit;
+  } else {
+    state.drag = 'orbit';
+  }
+  canvas.setPointerCapture(e.pointerId);
+  canvas.classList.add('grabbing');
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (state.drag === 'orbit') {
+    state.cam.yaw -= (e.offsetX - state.last[0]) * 0.008;
+    state.cam.pitch = clamp(state.cam.pitch + (e.offsetY - state.last[1]) * 0.008, -1.45, 1.45);
+    state.last = [e.offsetX, e.offsetY];
+  } else if (state.drag) {
+    let [wx, wy] = toWorld(e.offsetX, e.offsetY);
+    if (e.shiftKey) { wx = Math.round(wx * 2) / 2; wy = Math.round(wy * 2) / 2; }
+    else { wx = Math.round(wx * 100) / 100; wy = Math.round(wy * 100) / 100; }
+    const m = [...state.M2];
+    if (state.drag === '2d-i') { m[0] = wx; m[2] = wy; }
+    else { m[1] = wx; m[3] = wy; }
+    setMatrix(m);
+  } else if (state.mode === '2d') {
+    state.hover = hitTest2d(e.offsetX, e.offsetY);
+    canvas.classList.toggle('grabbable', !!state.hover);
+  }
+});
+canvas.addEventListener('pointerup', (e) => {
+  state.drag = null;
+  canvas.classList.remove('grabbing');
+  canvas.releasePointerCapture(e.pointerId);
+});
+
+/* ================= draw helpers (2D) ================= */
+function line(x1, y1, x2, y2) {
+  ctx.beginPath();
+  ctx.moveTo(sx(x1), sy(y1));
+  ctx.lineTo(sx(x2), sy(y2));
+  ctx.stroke();
+}
+function arrowPx(ox, oy, px, py, color, width) {
+  const len = Math.hypot(px - ox, py - oy);
+  ctx.strokeStyle = color; ctx.fillStyle = color;
+  ctx.lineWidth = width; ctx.lineCap = 'round';
+  if (len < 1) {
+    ctx.beginPath(); ctx.arc(ox, oy, 3, 0, TAU); ctx.fill();
+    return;
+  }
+  const head = Math.min(11, len * 0.4);
+  const ux = (px - ox) / len, uy = (py - oy) / len;
+  ctx.beginPath();
+  ctx.moveTo(ox, oy);
+  ctx.lineTo(px - ux * head * 0.8, py - uy * head * 0.8);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.lineTo(px - ux * head - uy * head * 0.45, py - uy * head + ux * head * 0.45);
+  ctx.lineTo(px - ux * head + uy * head * 0.45, py - uy * head - ux * head * 0.45);
+  ctx.closePath();
+  ctx.fill();
+}
+function label(text, px, py, color, dx = 8, dy = -8) {
+  ctx.font = 'italic 600 14px Georgia, serif';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'left';
+  ctx.fillText(text, px + dx, py + dy);
+}
+
+function gridExtent2(Mt) {
+  const hw = CX / state.scale2 + 1, hh = CY / state.scale2 + 1;
+  const d = det2(Mt);
+  if (Math.abs(d) < 1e-6) return 80;
+  const ia = Mt[3] / d, ib = -Mt[1] / d, ic = -Mt[2] / d, id = Mt[0] / d;
+  let mx = 2;
+  for (const [x, y] of [[hw, hh], [hw, -hh], [-hw, hh], [-hw, -hh]])
+    mx = Math.max(mx, Math.abs(ia * x + ib * y), Math.abs(ic * x + id * y));
+  return Math.min(200, Math.ceil(mx) + 1);
+}
+
+/* ================= render 2D ================= */
+function render2d(te) {
+  const Mt = lerp2(state.M2, te);
+  const eg = eigen2(state.M2);
+
+  // static grid + axes + numbers
+  if (state.show.bggrid) {
+    const hw = Math.ceil(CX / state.scale2), hh = Math.ceil(CY / state.scale2);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(70, 80, 110, 0.20)';
+    for (let k = -hw; k <= hw; k++) if (k) line(k, -hh, k, hh);
+    for (let k = -hh; k <= hh; k++) if (k) line(-hw, k, hw, k);
+    // axes
+    ctx.strokeStyle = 'rgba(140, 152, 185, 0.6)';
+    ctx.lineWidth = 1.2;
+    line(-hw, 0, hw, 0);
+    line(0, -hh, 0, hh);
+    // numbers along axes
+    const step = state.scale2 >= 44 ? 1 : state.scale2 >= 22 ? 2 : 5;
+    ctx.font = '11px ui-monospace, Menlo, monospace';
+    ctx.fillStyle = 'rgba(125, 135, 156, 0.85)';
+    ctx.textAlign = 'center';
+    for (let k = -hw; k <= hw; k += step) if (k) ctx.fillText(k, sx(k), sy(0) + 16);
+    ctx.textAlign = 'right';
+    for (let k = -hh; k <= hh; k += step) if (k) ctx.fillText(k, sx(0) - 7, sy(k) + 4);
+    // axis names
+    ctx.font = 'italic 13px Georgia, serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('x', W - 16, sy(0) - 8);
+    ctx.fillText('y', sx(0) + 8, 16);
+  }
+
+  // unit square → parallelogram
+  if (state.show.square) {
+    const d = det2(Mt);
+    const pts = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([x, y]) => apply2(Mt, x, y));
+    ctx.beginPath();
+    ctx.moveTo(sx(pts[0][0]), sy(pts[0][1]));
+    for (let i = 1; i < 4; i++) ctx.lineTo(sx(pts[i][0]), sy(pts[i][1]));
+    ctx.closePath();
+    ctx.fillStyle = d >= 0 ? 'rgba(94, 179, 255, 0.14)' : 'rgba(251, 146, 60, 0.16)';
+    ctx.fill();
+    ctx.strokeStyle = d >= 0 ? 'rgba(94, 179, 255, 0.45)' : 'rgba(251, 146, 60, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    if (state.show.labels) {
+      const [mx, my] = apply2(Mt, 0.5, 0.5);
+      ctx.font = '600 11px ui-monospace, Menlo, monospace';
+      ctx.fillStyle = d >= 0 ? 'rgba(94,179,255,0.9)' : 'rgba(251,146,60,0.95)';
+      ctx.textAlign = 'center';
+      ctx.fillText('det = ' + fmt(d), sx(mx), sy(my) + 4);
+    }
+  }
+
+  // transformed grid
+  if (state.show.grid) {
+    const N = gridExtent2(Mt);
+    ctx.lineWidth = 1.1;
+    ctx.strokeStyle = 'rgba(94, 179, 255, 0.28)';
+    for (let k = -N; k <= N; k++) {
+      if (!k) continue;
+      let p1 = apply2(Mt, k, -N), p2 = apply2(Mt, k, N);
+      line(p1[0], p1[1], p2[0], p2[1]);
+      p1 = apply2(Mt, -N, k); p2 = apply2(Mt, N, k);
+      line(p1[0], p1[1], p2[0], p2[1]);
+    }
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'rgba(125, 195, 255, 0.7)';
+    let p1 = apply2(Mt, 0, -N), p2 = apply2(Mt, 0, N);
+    line(p1[0], p1[1], p2[0], p2[1]);
+    p1 = apply2(Mt, -N, 0); p2 = apply2(Mt, N, 0);
+    line(p1[0], p1[1], p2[0], p2[1]);
+  }
+
+  // eigenlines
+  if (state.show.eigen && !eg.complex && !eg.fullPlane) {
+    const L = (CX + CY) / state.scale2;
+    eg.pairs.forEach((p, idx) => {
+      if (!p.v) return;
+      const [ux, uy] = p.v;
+      ctx.setLineDash([7, 6]);
+      ctx.lineWidth = 1.3;
+      ctx.strokeStyle = 'rgba(242, 193, 78, 0.5)';
+      line(-ux * L, -uy * L, ux * L, uy * L);
+      ctx.setLineDash([]);
+      const mu = (1 - te) + te * p.l;
+      arrowPx(sx(0), sy(0), sx(ux * mu), sy(uy * mu), '#f2c14e', 2.4);
+      if (state.show.labels) {
+        const lx = ux * Math.min(L, 3.4 + idx * 0.5), ly = uy * Math.min(L, 3.4 + idx * 0.5);
+        label('λ' + (eg.pairs.length > 1 ? SUB[idx] : '') + ' = ' + fmt(p.l), sx(lx), sy(ly), '#f2c14e');
+      }
+    });
+  }
+
+  // circle → ellipse
+  if (state.show.circle) {
+    ctx.beginPath();
+    for (let i = 0; i <= 96; i++) {
+      const th = i / 96 * TAU;
+      const [x, y] = apply2(Mt, Math.cos(th), Math.sin(th));
+      i ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y));
+    }
+    ctx.strokeStyle = 'rgba(192, 132, 252, 0.75)';
+    ctx.lineWidth = 1.7;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(sx(0), sy(0), state.scale2, 0, TAU);
+    ctx.strokeStyle = 'rgba(192, 132, 252, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // basis vectors
+  arrowPx(sx(0), sy(0), sx(Mt[0]), sy(Mt[2]), '#52d97e', state.hover === '2d-i' || state.drag === '2d-i' ? 4.4 : 3);
+  arrowPx(sx(0), sy(0), sx(Mt[1]), sy(Mt[3]), '#ff6b6b', state.hover === '2d-j' || state.drag === '2d-j' ? 4.4 : 3);
+  if (state.show.labels) {
+    label('î', sx(Mt[0]), sy(Mt[2]), '#52d97e', 10, -6);
+    label('ĵ', sx(Mt[1]), sy(Mt[3]), '#ff6b6b', 10, -6);
+  }
+
+  ctx.beginPath();
+  ctx.arc(sx(0), sy(0), 2.5, 0, TAU);
+  ctx.fillStyle = '#dbe2f0';
+  ctx.fill();
+
+  hud.innerHTML =
+    `M(t) = <span class="m">[ ${fmt(Mt[0])}  ${fmt(Mt[1])} ]</span><br>` +
+    `<span class="m">[ ${fmt(Mt[2])}  ${fmt(Mt[3])} ]</span><br>` +
+    `det = <span class="m">${fmt(det2(Mt))}</span>`;
+}
+
+/* ================= render 3D ================= */
+function line3(p1, p2, rgb, alpha, width) {
+  const a = project(p1), b = project(p2);
+  if (a[2] < 0.5 && b[2] < 0.5) return;
+  ctx.strokeStyle = `rgba(${rgb},${(alpha * fade((a[2] + b[2]) / 2)).toFixed(3)})`;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(a[0], a[1]);
+  ctx.lineTo(b[0], b[1]);
+  ctx.stroke();
+}
+function arrow3(v, color, width) {
+  const o = project([0, 0, 0]), p = project(v);
+  arrowPx(o[0], o[1], p[0], p[1], color, width);
+}
+
+function render3d(te) {
+  const Mt = lerp3(state.M3, te);
+  const eg = eigen3(state.M3);
+  const EXT = 3;
+
+  // floor grid (z = 0) + axes + tick numbers
+  if (state.show.bggrid) {
+    for (let k = -EXT; k <= EXT; k++) {
+      line3([k, -EXT, 0], [k, EXT, 0], '70, 80, 110', 0.28, 1);
+      line3([-EXT, k, 0], [EXT, k, 0], '70, 80, 110', 0.28, 1);
+    }
+    line3([-EXT - 1, 0, 0], [EXT + 1, 0, 0], '140, 152, 185', 0.6, 1.2);
+    line3([0, -EXT - 1, 0], [0, EXT + 1, 0], '140, 152, 185', 0.6, 1.2);
+    line3([0, 0, -EXT], [0, 0, EXT + 1], '140, 152, 185', 0.6, 1.2);
+    ctx.font = '11px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+    for (let k = 1; k <= EXT; k++) {
+      for (const [p, off] of [[[k, 0, 0], 12], [[0, k, 0], 12], [[0, 0, k], -8]]) {
+        const q = project(p);
+        ctx.fillStyle = `rgba(125,135,156,${0.8 * fade(q[2])})`;
+        ctx.fillText(k, q[0], q[1] + off);
+      }
+    }
+    ctx.font = 'italic 13px Georgia, serif';
+    for (const [name, p] of [['x', [EXT + 1.4, 0, 0]], ['y', [0, EXT + 1.4, 0]], ['z', [0, 0, EXT + 1.4]]]) {
+      const q = project(p);
+      ctx.fillStyle = 'rgba(125,135,156,0.9)';
+      ctx.fillText(name, q[0], q[1]);
+    }
+  }
+
+  // transformed lattice
+  if (state.show.grid) {
+    const n = 2;
+    for (let j = -n; j <= n; j++) for (let k = -n; k <= n; k++) {
+      line3(apply3(Mt, [-n, j, k]), apply3(Mt, [n, j, k]), '94, 179, 255', 0.22, 1);
+      line3(apply3(Mt, [j, -n, k]), apply3(Mt, [j, n, k]), '94, 179, 255', 0.22, 1);
+      line3(apply3(Mt, [j, k, -n]), apply3(Mt, [j, k, n]), '94, 179, 255', 0.22, 1);
+    }
+    // transformed axes brighter
+    line3(apply3(Mt, [-n, 0, 0]), apply3(Mt, [n, 0, 0]), '125, 195, 255', 0.65, 1.5);
+    line3(apply3(Mt, [0, -n, 0]), apply3(Mt, [0, n, 0]), '125, 195, 255', 0.65, 1.5);
+    line3(apply3(Mt, [0, 0, -n]), apply3(Mt, [0, 0, n]), '125, 195, 255', 0.65, 1.5);
+  }
+
+  // sphere → ellipsoid (three great circles)
+  if (state.show.circle) {
+    const planes = [
+      (th) => [Math.cos(th), Math.sin(th), 0],
+      (th) => [0, Math.cos(th), Math.sin(th)],
+      (th) => [Math.cos(th), 0, Math.sin(th)],
+    ];
+    for (const f of planes) {
+      ctx.beginPath();
+      let first = true;
+      for (let i = 0; i <= 72; i++) {
+        const p = project(apply3(Mt, f(i / 72 * TAU)));
+        first ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]);
+        first = false;
+      }
+      ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+  }
+
+  // unit cube → parallelepiped
+  if (state.show.square) {
+    const d = det3(Mt);
+    const V = [];
+    for (const i of [0, 1]) for (const j of [0, 1]) for (const k of [0, 1])
+      V.push(project(apply3(Mt, [i, j, k])));
+    const idx = (i, j, k) => i * 4 + j * 2 + k;
+    const faces = [
+      [idx(0,0,0), idx(0,1,0), idx(0,1,1), idx(0,0,1)],
+      [idx(1,0,0), idx(1,1,0), idx(1,1,1), idx(1,0,1)],
+      [idx(0,0,0), idx(1,0,0), idx(1,0,1), idx(0,0,1)],
+      [idx(0,1,0), idx(1,1,0), idx(1,1,1), idx(0,1,1)],
+      [idx(0,0,0), idx(1,0,0), idx(1,1,0), idx(0,1,0)],
+      [idx(0,0,1), idx(1,0,1), idx(1,1,1), idx(0,1,1)],
+    ];
+    faces.sort((f1, f2) =>
+      f2.reduce((s, i) => s + V[i][2], 0) - f1.reduce((s, i) => s + V[i][2], 0));
+    const rgb = d >= 0 ? '94, 179, 255' : '251, 146, 60';
+    for (const f of faces) {
+      ctx.beginPath();
+      ctx.moveTo(V[f[0]][0], V[f[0]][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(V[f[i]][0], V[f[i]][1]);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(${rgb}, 0.07)`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(${rgb}, 0.4)`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    if (state.show.labels) {
+      const c = project(apply3(Mt, [0.5, 0.5, 0.5]));
+      ctx.font = '600 11px ui-monospace, Menlo, monospace';
+      ctx.fillStyle = d >= 0 ? 'rgba(94,179,255,0.95)' : 'rgba(251,146,60,0.95)';
+      ctx.textAlign = 'center';
+      ctx.fillText('det = ' + fmt(d), c[0], c[1] + 4);
+    }
+  }
+
+  // eigenplanes (repeated eigenvalue with a 2D eigenspace)
+  if (state.show.eigen) {
+    for (const g of eg.groups) {
+      if (!g.plane) continue;
+      const [t1, t2] = planeBasis(g.plane);
+      const s = 2.2;
+      const quad = [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([p, q]) =>
+        project([
+          (t1[0] * p + t2[0] * q) * s,
+          (t1[1] * p + t2[1] * q) * s,
+          (t1[2] * p + t2[2] * q) * s,
+        ]));
+      ctx.beginPath();
+      ctx.moveTo(quad[0][0], quad[0][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(quad[i][0], quad[i][1]);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(242, 193, 78, 0.06)';
+      ctx.fill();
+      ctx.setLineDash([6, 6]);
+      ctx.strokeStyle = 'rgba(242, 193, 78, 0.35)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (state.show.labels)
+        label(`λ = ${fmt(g.l)} (plane)`, quad[0][0], quad[0][1], 'rgba(242,193,78,0.8)');
+    }
+  }
+
+  // eigenlines (real eigenvalues)
+  if (state.show.eigen) {
+    const L = 5;
+    eg.groups.forEach((g, idx) => {
+      if (!g.v) return;
+      const [ux, uy, uz] = g.v;
+      ctx.setLineDash([6, 6]);
+      line3([-ux * L, -uy * L, -uz * L], [ux * L, uy * L, uz * L], '242, 193, 78', 0.55, 1.3);
+      ctx.setLineDash([]);
+      const mu = (1 - te) + te * g.l;
+      arrow3([ux * mu, uy * mu, uz * mu], '#f2c14e', 2.2);
+      if (state.show.labels) {
+        const q = project([ux * 3.4, uy * 3.4, uz * 3.4]);
+        label('λ' + (eg.groups.length > 1 ? SUB[idx] : '') + ' = ' + fmt(g.l), q[0], q[1], '#f2c14e');
+      }
+    });
+  }
+
+  // basis vectors
+  arrow3([Mt[0], Mt[3], Mt[6]], '#52d97e', 2.8);
+  arrow3([Mt[1], Mt[4], Mt[7]], '#ff6b6b', 2.8);
+  arrow3([Mt[2], Mt[5], Mt[8]], '#6ea8ff', 2.8);
+  if (state.show.labels) {
+    const pi = project([Mt[0], Mt[3], Mt[6]]);
+    const pj = project([Mt[1], Mt[4], Mt[7]]);
+    const pk = project([Mt[2], Mt[5], Mt[8]]);
+    label('î', pi[0], pi[1], '#52d97e', 9, -6);
+    label('ĵ', pj[0], pj[1], '#ff6b6b', 9, -6);
+    label('k̂', pk[0], pk[1], '#6ea8ff', 9, -6);
+  }
+
+  const o = project([0, 0, 0]);
+  ctx.beginPath();
+  ctx.arc(o[0], o[1], 2.5, 0, TAU);
+  ctx.fillStyle = '#dbe2f0';
+  ctx.fill();
+
+  hud.innerHTML =
+    `M(t) = <span class="m">[ ${fmt(Mt[0])}  ${fmt(Mt[1])}  ${fmt(Mt[2])} ]</span><br>` +
+    `<span class="m">[ ${fmt(Mt[3])}  ${fmt(Mt[4])}  ${fmt(Mt[5])} ]</span><br>` +
+    `<span class="m">[ ${fmt(Mt[6])}  ${fmt(Mt[7])}  ${fmt(Mt[8])} ]</span><br>` +
+    `det = <span class="m">${fmt(det3(Mt))}</span>`;
+}
+
+/* ================= main loop ================= */
+function render(now) {
+  if (state.playing) {
+    const t = state.playFrom + (now - state.playStart) / state.duration;
+    setT(t);
+    if (t >= 1) stopPlay();
+  }
+  ctx.clearRect(0, 0, W, H);
+  const te = ease(state.t);
+  state.mode === '2d' ? render2d(te) : render3d(te);
+  requestAnimationFrame(render);
+}
+
+/* ================= properties panel ================= */
+function classify2(M) {
+  const chips = [];
+  const det = det2(M);
+  // loose tolerance: presets are rounded to 3 decimals, labels are descriptive
+  const eq = (x, y) => Math.abs(x - y) < 1e-3;
+  const isZero = M.every(x => Math.abs(x) < EPS);
+  const isId = eq(M[0], 1) && eq(M[1], 0) && eq(M[2], 0) && eq(M[3], 1);
+  if (isZero) return [['Zero matrix — everything collapses to the origin', 'warn']];
+  if (isId) return [['Identity — nothing changes', '']];
+  const isDiag = eq(M[1], 0) && eq(M[2], 0);
+  const isOrth = eq(M[0] ** 2 + M[2] ** 2, 1) && eq(M[1] ** 2 + M[3] ** 2, 1) && eq(M[0] * M[1] + M[2] * M[3], 0);
+  const sq = [M[0] ** 2 + M[1] * M[2], M[1] * (M[0] + M[3]), M[2] * (M[0] + M[3]), M[3] ** 2 + M[1] * M[2]];
+  const sqIs = (N) => sq.every((x, i) => eq(x, N[i]));
+  if (isDiag && eq(M[0], M[3])) chips.push([`Uniform scaling ${fmt(M[0])}×`, '']);
+  else if (isDiag) chips.push(['Axis-aligned scaling', '']);
+  if (isOrth && det > 0) chips.push([`Rotation ${fmt(Math.atan2(M[2], M[0]) * 180 / Math.PI, 1)}°`, '']);
+  if (isOrth && det < 0) chips.push([`Reflection (line at ${fmt(Math.atan2(M[2], M[0]) * 90 / Math.PI, 1)}°)`, '']);
+  if ((eq(M[0], 1) && eq(M[3], 1)) && ((eq(M[2], 0) && !eq(M[1], 0)) || (eq(M[1], 0) && !eq(M[2], 0))))
+    chips.push(['Shear', '']);
+  if (eq(M[1], M[2]) && !isDiag) chips.push(['Symmetric — orthogonal eigenvectors', 'gold']);
+  if (sqIs(M) && !isId) chips.push(['Projection (M² = M)', 'gold']);
+  if (sqIs([1, 0, 0, 1]) && !isId) chips.push(['Involution (M² = I)', 'gold']);
+  if (Math.abs(det) < 1e-8) chips.push(['Singular — the plane collapses to a line', 'warn']);
+  if (det < -1e-8) chips.push(['Reverses orientation (det < 0)', 'warn']);
+  if (Math.abs(det) > 1e-8 && !eq(Math.abs(det), 1)) chips.push([`Scales area ${fmt(Math.abs(det))}×`, '']);
+  if (!chips.length) chips.push(['General transform', '']);
+  return chips;
+}
+
+function classify3(M) {
+  const chips = [];
+  const det = det3(M);
+  const eq = (x, y) => Math.abs(x - y) < 1e-3;
+  const isZero = M.every(x => Math.abs(x) < EPS);
+  const isId = M.every((x, i) => eq(x, I3[i]));
+  if (isZero) return [['Zero matrix — everything collapses to the origin', 'warn']];
+  if (isId) return [['Identity — nothing changes', '']];
+  const isDiag = [1, 2, 3, 5, 6, 7].every(i => eq(M[i], 0));
+  const mtm = mul3(tp3(M), M);
+  const isOrth = mtm.every((x, i) => eq(x, I3[i]));
+  const isSym = eq(M[1], M[3]) && eq(M[2], M[6]) && eq(M[5], M[7]);
+  const sq = mul3(M, M);
+  const sqIs = (N) => sq.every((x, i) => eq(x, N[i]));
+  if (isDiag && eq(M[0], M[4]) && eq(M[4], M[8])) chips.push([`Uniform scaling ${fmt(M[0])}×`, '']);
+  else if (isDiag) chips.push(['Axis-aligned scaling', '']);
+  if (isOrth && det > 0) {
+    const ang = Math.acos(clamp((M[0] + M[4] + M[8] - 1) / 2, -1, 1)) * 180 / Math.PI;
+    const axis = eigen3(M).groups.find(g => Math.abs(g.l - 1) < 1e-6 && g.v);
+    chips.push([`Rotation ${fmt(ang, 1)}°` + (axis && ang > 1e-6 ? ` about ${fmtVec(axis.v)}` : ''), '']);
+  }
+  if (isOrth && det < 0) chips.push(['Improper rotation (includes a reflection)', '']);
+  if (isSym && !isDiag) chips.push(['Symmetric — orthogonal eigenvectors', 'gold']);
+  if (sqIs(M) && !isId) chips.push(['Projection (M² = M)', 'gold']);
+  if (sqIs(I3) && !isId) chips.push(['Involution (M² = I)', 'gold']);
+  if (Math.abs(det) < 1e-8) {
+    const r = rank3(M);
+    chips.push([`Singular — space collapses to a ${r === 2 ? 'plane' : r === 1 ? 'line' : 'point'}`, 'warn']);
+  }
+  if (det < -1e-8) chips.push(['Reverses orientation (det < 0)', 'warn']);
+  if (Math.abs(det) > 1e-8 && !eq(Math.abs(det), 1)) chips.push([`Scales volume ${fmt(Math.abs(det))}×`, '']);
+  if (!chips.length) chips.push(['General transform', '']);
+  return chips;
+}
+
+function polyStr(terms) {
+  // terms: [[coef, 'λ³'], [coef, 'λ²'], ...] first coef assumed 1
+  let s = terms[0][1];
+  for (let i = 1; i < terms.length; i++) {
+    const [c, sym] = terms[i];
+    if (Math.abs(c) < EPS) continue;
+    const a = Math.abs(c);
+    const cs = (sym && Math.abs(a - 1) < EPS) ? '' : fmt(a);
+    s += (c > 0 ? ' + ' : ' − ') + cs + sym;
+  }
+  return s;
+}
+
+function matHTML(lab, m, n) {
+  const cells = m.map(x => `<span>${fmt(x)}</span>`).join('');
+  return `<div class="mmbox"><div class="mml">${lab}</div>` +
+         `<div class="mm" style="grid-template-columns:repeat(${n},auto)">${cells}</div></div>`;
+}
+
+function updateDecomp() {
+  const n = state.mode === '2d' ? 2 : 3;
+  const dec = state.mode === '2d' ? decomp2(state.M2) : decomp3(state.M3);
+  let html = '';
+  if (dec.kind === 'diag') {
+    html += `<div class="dec-eq">Diagonalizable: <b>M = P · D · P⁻¹</b></div>`;
+    html += `<div class="mats">${matHTML('P', dec.P, n)}${matHTML('D', dec.D, n)}${matHTML('P⁻¹', dec.Pinv, n)}</div>`;
+  } else if (dec.kind === 'jordan') {
+    html += `<div class="dec-eq">Not diagonalizable — Jordan normal form: <b>M = P · J · P⁻¹</b></div>`;
+    html += `<div class="mats">${matHTML('P', dec.P, n)}${matHTML('J', dec.D, n)}${matHTML('P⁻¹', dec.Pinv, n)}</div>`;
+  } else if (dec.kind === 'complex') {
+    html += `<div class="dec-eq">Complex eigenvalues — real canonical form: <b>M = P · C · P⁻¹</b></div>`;
+    html += `<div class="mats">${matHTML('P', dec.P, n)}${matHTML('C', dec.D, n)}${matHTML('P⁻¹', dec.Pinv, n)}</div>`;
+  }
+  if (dec.note) html += `<div class="dec-eq">${dec.note}</div>`;
+  html += dec.inv
+    ? `<div class="dec-eq" style="margin-top:12px">Inverse:</div><div class="mats">${matHTML('M⁻¹', dec.inv, n)}</div>`
+    : `<div class="dec-eq" style="margin-top:12px">M⁻¹ does not exist (det = 0)</div>`;
+  $('decomp').innerHTML = html;
+}
+
+function updateProps() {
+  const rows = [];
+  const row = (k, v, cls = '') =>
+    rows.push(`<div class="prop-row"><span class="k">${k}</span><span class="v ${cls}">${v}</span></div>`);
+
+  if (state.mode === '2d') {
+    const M = state.M2;
+    const eg = eigen2(M);
+    const [s1, s2] = sv2(M);
+    row('Determinant', fmt(eg.det), 'accent');
+    row('Trace', fmt(eg.tr));
+    row('Rank', rank2(M));
+    if (eg.complex) {
+      row('Eigenvalues', `${fmt(eg.re)} ± ${fmt(eg.im)}i`, 'gold');
+      row('Eigenvectors', 'complex (rotational)', 'gold');
+    } else if (eg.fullPlane) {
+      row('Eigenvalues', `λ = ${fmt(eg.pairs[0].l)} (double)`, 'gold');
+      row('Eigenvectors', 'every vector', 'gold');
+    } else if (eg.defective) {
+      row('Eigenvalues', `λ = ${fmt(eg.pairs[0].l)} (double)`, 'gold');
+      row('Eigenvector', fmtVec(eg.pairs[0].v) + ' (defective)', 'gold');
+    } else {
+      row('Eigenvalues', `λ₁ = ${fmt(eg.pairs[0].l)},  λ₂ = ${fmt(eg.pairs[1].l)}`, 'gold');
+      row('v₁', fmtVec(eg.pairs[0].v), 'gold');
+      row('v₂', fmtVec(eg.pairs[1].v), 'gold');
+    }
+    row('Singular values', `σ₁ = ${fmt(s1)},  σ₂ = ${fmt(s2)}`, 'violet');
+    row('Char. poly', polyStr([[1, 'λ²'], [-eg.tr, 'λ'], [eg.det, '']]));
+    $('chips').innerHTML = classify2(M).map(([t, c]) => `<span class="chip ${c}">${t}</span>`).join('');
+  } else {
+    const M = state.M3;
+    const eg = eigen3(M);
+    const sv = sv3(M);
+    row('Determinant', fmt(eg.det), 'accent');
+    row('Trace', fmt(eg.tr));
+    row('Rank', rank3(M));
+    const evParts = eg.groups.map((g, i) =>
+      `λ${eg.groups.length > 1 || eg.complex ? SUB[i] : ''} = ${fmt(g.l)}${g.mult > 1 ? ` (×${g.mult})` : ''}`);
+    if (eg.complex) evParts.push(`${fmt(eg.complex.re)} ± ${fmt(eg.complex.im)}i`);
+    row('Eigenvalues', evParts.join(',  '), 'gold');
+    eg.groups.forEach((g, i) => {
+      const name = 'v' + (eg.groups.length > 1 ? SUB[i] : '');
+      if (g.v) row(name, fmtVec(g.v), 'gold');
+      else if (g.plane) row(name, `plane ⊥ ${fmtVec(g.plane)}`, 'gold');
+      else if (g.space) row(name, 'every vector', 'gold');
+    });
+    if (eg.complex) row('', 'complex pair → rotational part', 'gold');
+    row('Singular values', sv.map((s, i) => `σ${SUB[i]} = ${fmt(s)}`).join(', '), 'violet');
+    row('Char. poly', polyStr([[1, 'λ³'], [-eg.tr, 'λ²'], [eg.minorSum, 'λ'], [-eg.det, '']]));
+    $('chips').innerHTML = classify3(M).map(([t, c]) => `<span class="chip ${c}">${t}</span>`).join('');
+  }
+  $('props').innerHTML = rows.join('');
+  updateDecomp();
+}
+
+/* ================= boot ================= */
+const hashMode = readHash();
+setMode(hashMode || '2d');
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
