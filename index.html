@@ -39,6 +39,17 @@
   }
   #sidebar h1 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
   #sidebar h1 span { color: var(--accent); font-weight: 400; }
+  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .support-btn {
+    font-size: 11px;
+    color: var(--dim);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 3px 9px;
+    white-space: nowrap;
+  }
+  .support-btn:hover { color: var(--accent); border-color: var(--accent); }
 
   .tabs {
     display: flex;
@@ -274,7 +285,10 @@
 <body>
 <div id="app">
   <aside id="sidebar">
-    <h1>Matrix <span>Visualizer</span></h1>
+    <div class="title-row">
+      <h1>Matrix <span>Visualizer</span></h1>
+      <a class="support-btn" href="https://ko-fi.com/bengin" target="_blank" rel="noopener">support ♥</a>
+    </div>
     <div class="tabs">
       <button id="tab-2d" class="active">2 × 2</button>
       <button id="tab-3d">3 × 3</button>
